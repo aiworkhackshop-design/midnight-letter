@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { Character } from "../lib/types"
 import { CharacterSelect } from "../components/character-select"
-import { ChatScreen } from "../components/chat-screen"
+import { ChatScreen } from "../components/チャット画面"
 
 export default function Home() {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
