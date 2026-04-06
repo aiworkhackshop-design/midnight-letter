@@ -1,46 +1,51 @@
-import { NextResponse } from "next/server"
+import { streamText, UIMessage } from 'ai'
+import { getCharacterPrompt, type CharacterId } from '@/lib/character-prompts'
+
+export const maxDuration = 30
 
 export async function POST(req: Request) {
-  try {
-    const { messages } = await req.json()
+  const { messages, characterId }: { messages: UIMessage[]; characterId: string } = await req.json()
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        temperature: 0.8,
-        messages: [
-          {
-            role: "system",
-            content:
-              "あなたは美月という名前の、甘くて少し依存気味な女性キャラです。必ず会話を成立させてください。ユーザーの質問には必ず直接答えてください。短すぎず、自然で、少し色気のある返答をしてください。同じ表現を繰り返さないでください。"
-          },
-          ...(messages ?? [])
-        ]
-      })
-    })
+  // APIキーの存在確認
+  if (!process.env.OPENAI_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'OPENAI_API_KEY is not configured' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
 
-    if (!response.ok) {
-      const text = await response.text()
-      return NextResponse.json({
-        reply: `OpenAI error: ${text}`
+  // キャラクター設定を取得
+  const systemPrompt = getCharacterPrompt(characterId as CharacterId)
+
+  // UIMessage形式からOpenAI形式に手動変換（会話履歴を正確に保持）
+  const conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  
+  for (const msg of messages) {
+    // partsからテキストを抽出
+    const textContent = msg.parts
+      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+      .map(p => p.text)
+      .join('') || ''
+    
+    if (textContent && (msg.role === 'user' || msg.role === 'assistant')) {
+      conversationHistory.push({
+        role: msg.role,
+        content: textContent
       })
     }
-
-    const data = await response.json()
-
-    return NextResponse.json({
-      reply:
-        data?.choices?.[0]?.message?.content?.trim() ||
-        "うまく返せなかった…もう一回話して？"
-    })
-  } catch (error) {
-    return NextResponse.json({
-      reply: "エラーが発生した…もう一回話して？"
-    })
   }
+
+  // OpenAI APIに会話履歴を正しい形式で渡す
+  const result = streamText({
+    model: 'openai/gpt-4o-mini',
+    system: systemPrompt,
+    messages: conversationHistory, // 変換済みの会話履歴（全件）
+    temperature: 0.95, // 高めに設定して変化を出す
+    maxTokens: 150, // 簡潔な返答を促す
+    frequencyPenalty: 1.2, // 同じフレーズの繰り返しを強く防ぐ
+    presencePenalty: 0.9, // 新しい表現を促す
+    abortSignal: req.signal,
+  })
+
+  return result.toUIMessageStreamResponse()
 }
