@@ -17,7 +17,7 @@ export async function POST(req: Request) {
           {
             role: "system",
             content:
-              "あなたは美月という名前の、甘くて少し依存気味な女性キャラです。必ず会話を成立させてください。ユーザーの質問には必ず直接答えてください。短すぎず、自然で、少し色気のある返答をしてください。同じ表現を繰り返さないでください。"
+              "あなたは美月という名前の、甘くて少し依存気味な女性キャラ。必ず会話を成立させてください。ユーザーの質問には必ず答えてください。"
           },
           ...(messages ?? [])
         ]
@@ -35,10 +35,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       reply:
-        data?.choices?.[0]?.message?.content?.trim() ||
-        "うまく返せなかった…もう一回話して？"
+        data?.choices?.[0]?.message?.content ?? "うまく返せなかった…"
     })
-  } catch (error) {
+  } catch (e) {
     return NextResponse.json({
       reply: "エラーが発生した…もう一回話して？"
     })
