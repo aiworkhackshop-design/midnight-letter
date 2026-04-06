@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import type { Character } from "@/lib/types"
-import { CharacterSelect } from "@/components/character-select"
-import { ChatScreen } from "@/components/chat-screen"
+import type { Character } from "../lib/types"
+import { CharacterSelect } from "../components/character-select"
+import { ChatScreen } from "../components/chat-screen"
 
 export default function Home() {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
@@ -25,4 +25,3 @@ export default function Home() {
     </main>
   )
 }
-
