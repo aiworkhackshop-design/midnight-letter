@@ -1,8 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
+import { useState, useRef, useEffect } from "react"
 import type { Character } from "@/lib/types"
 import { MessageLimit } from "./message-limit"
 import { PremiumModal } from "./premium-modal"
@@ -13,80 +11,111 @@ interface ChatScreenProps {
   onBack: () => void
 }
 
-// UIMessageからテキストを抽出するヘルパー
-function getMessageText(message: { parts?: Array<{ type: string; text?: string }> }): string {
-  if (!message.parts || !Array.isArray(message.parts)) return ""
-  return message.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join("")
+type ChatMessage = {
+  id: string
+  role: "user" | "assistant"
+  content: string
 }
 
 export function ChatScreen({ character, onBack }: ChatScreenProps) {
   const [showPremiumModal, setShowPremiumModal] = useState(false)
   const [messageCount, setMessageCount] = useState(0)
   const [isPremium, setIsPremium] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // セッションごとにユニークなIDを生成（キャラ切り替えで履歴をリセット）
-  const [sessionId] = useState(() => `${character.id}-${Date.now()}`)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "greeting",
+      role: "assistant",
+      content: character.greeting,
+    },
+  ])
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => ({
-          body: { messages, characterId: character.id },
-        }),
-      }),
-    [character.id]
-  )
-
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport,
-    id: sessionId, // ユニークなセッションIDを使用
-  })
-
-  const isLoading = status === "streaming" || status === "submitted"
   const remainingMessages = isPremium ? 999 : Math.max(0, 10 - messageCount)
 
-  // 初期挨拶メッセージを設定
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: "greeting",
-          role: "assistant",
-          parts: [{ type: "text", text: character.greeting }],
-        },
-      ])
-    }
-  }, [character.greeting, messages.length, setMessages])
+    setMessages([
+      {
+        id: "greeting",
+        role: "assistant",
+        content: character.greeting,
+      },
+    ])
+    setInput("")
+    setMessageCount(0)
+    setIsLoading(false)
+  }, [character.id, character.greeting])
 
-  const scrollToBottom = () => {
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  }, [messages, isLoading])
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    const text = input.trim()
+    if (!text || isLoading) return
 
     if (remainingMessages <= 0) {
       setShowPremiumModal(true)
       return
     }
 
-    setMessageCount((prev) => prev + 1)
-    const messageText = input.trim()
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+    }
+
+    const nextMessages = [...messages, userMessage]
+
+    setMessages(nextMessages)
     setInput("")
-    sendMessage({ text: messageText })
+    setMessageCount((prev) => prev + 1)
+    setIsLoading(true)
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          characterId: character.id,
+          messages: nextMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      })
+
+      const data = await res.json()
+      const reply =
+        typeof data?.reply === "string" && data.reply.trim()
+          ? data.reply.trim()
+          : "うまく返せなかった…もう一回話して？"
+
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: reply,
+      }
+
+      setMessages([...nextMessages, assistantMessage])
+    } catch {
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "通信が少し不安定みたい…もう一回だけ話しかけて？",
+      }
+
+      setMessages([...nextMessages, assistantMessage])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -95,12 +124,11 @@ export function ChatScreen({ character, onBack }: ChatScreenProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/40 bg-background/90 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-foreground hover:bg-card transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-card"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -143,11 +171,9 @@ export function ChatScreen({ character, onBack }: ChatScreenProps) {
         />
       </header>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-2xl space-y-4">
           {messages.map((message) => {
-            const text = getMessageText(message)
             const isUser = message.role === "user"
 
             return (
@@ -174,13 +200,13 @@ export function ChatScreen({ character, onBack }: ChatScreenProps) {
                       : "rounded-bl-sm border border-border/50 bg-card text-foreground"
                   )}
                 >
-                  {text}
+                  {message.content}
                 </div>
               </div>
             )
           })}
 
-          {isLoading && messages[messages.length - 1]?.role === "user" && (
+          {isLoading && (
             <div className="flex items-end gap-3">
               <div
                 className={cn(
@@ -202,7 +228,6 @@ export function ChatScreen({ character, onBack }: ChatScreenProps) {
         </div>
       </div>
 
-      {/* Input */}
       <div className="sticky bottom-0 border-t border-border/40 bg-background/95 px-4 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-2xl items-end gap-3">
           <div className="relative flex-1">
