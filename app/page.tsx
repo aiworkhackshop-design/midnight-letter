@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type Message = {
   role: "user" | "assistant"
@@ -16,23 +16,20 @@ export default function Page() {
   const endRef = useRef<HTMLDivElement | null>(null)
 
   const characterName = "美月"
-  const remaining = useMemo(() => Math.max(0, 10 - Math.floor(messages.length / 2)), [messages])
+  const remaining = Math.max(0, 10 - Math.floor((messages.length - 1) / 2))
 
-  const scrollToBottom = () => {
-    requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ behavior: "smooth" })
-    })
-  }
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+  }, [messages, sending])
 
   const send = async () => {
     const text = input.trim()
     if (!text || sending) return
 
-    const newMessages: Message[] = [...messages, { role: "user", content: text }]
-    setMessages(newMessages)
+    const nextMessages: Message[] = [...messages, { role: "user", content: text }]
+    setMessages(nextMessages)
     setInput("")
     setSending(true)
-    scrollToBottom()
 
     try {
       const res = await fetch("/api/chat", {
@@ -42,14 +39,14 @@ export default function Page() {
         },
         body: JSON.stringify({
           characterId: "mitsuki",
-          messages: newMessages
+          messages: nextMessages
         })
       })
 
       const data = await res.json()
 
       setMessages([
-        ...newMessages,
+        ...nextMessages,
         {
           role: "assistant",
           content: data.reply || "うまく返せなかった…もう一回話して？"
@@ -57,7 +54,7 @@ export default function Page() {
       ])
     } catch {
       setMessages([
-        ...newMessages,
+        ...nextMessages,
         {
           role: "assistant",
           content: "通信が少し不安定みたい…もう一回だけ話しかけて？"
@@ -65,7 +62,6 @@ export default function Page() {
       ])
     } finally {
       setSending(false)
-      scrollToBottom()
     }
   }
 
@@ -85,7 +81,12 @@ export default function Page() {
 
           <div style={styles.progressWrap}>
             <div style={styles.progressBar}>
-              <div style={{ ...styles.progressFill, width: `${Math.max(10, remaining * 10)}%` }} />
+              <div
+                style={{
+                  ...styles.progressFill,
+                  width: `${Math.max(10, remaining * 10)}%`
+                }}
+              />
             </div>
             <div style={styles.progressText}>{remaining}/10</div>
           </div>
@@ -120,7 +121,7 @@ export default function Page() {
           {sending && (
             <div style={styles.row}>
               <div style={styles.smallAvatar}>美</div>
-              <div style={{ ...styles.bubble, ...styles.assistantBubble, opacity: 0.8 }}>
+              <div style={{ ...styles.bubble, ...styles.assistantBubble, opacity: 0.75 }}>
                 入力中…
               </div>
             </div>
@@ -150,32 +151,28 @@ export default function Page() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    minHeight: "100vh",
-    background: "#03040d",
-    color: "#fff",
-    display: "flex",
-    justifyContent: "center"
+    minHeight: "100dvh",
+    background: "#040611",
+    color: "#fff"
   },
   shell: {
-    width: "100%",
     maxWidth: 520,
-    minHeight: "100vh",
-    background:
-      "linear-gradient(180deg, #050714 0%, #040511 45%, #02030a 100%)",
+    margin: "0 auto",
+    minHeight: "100dvh",
     display: "flex",
-    flexDirection: "column"
+    flexDirection: "column",
+    background: "linear-gradient(180deg, #050714 0%, #03040d 100%)"
   },
   header: {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    padding: "18px 16px",
+    padding: "16px 14px",
     borderBottom: "1px solid rgba(255,255,255,0.06)",
+    background: "rgba(3,4,13,0.96)",
     position: "sticky",
     top: 0,
-    background: "rgba(3,4,13,0.92)",
-    backdropFilter: "blur(10px)",
-    zIndex: 10
+    zIndex: 20
   },
   backButton: {
     border: "none",
@@ -184,58 +181,60 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 34,
     lineHeight: 1,
     padding: 0,
-    width: 24,
-    cursor: "pointer"
+    width: 24
   },
   profile: {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   avatar: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: 999,
     background: "linear-gradient(135deg, #ff5ba7 0%, #ff2d7a 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: 700,
-    boxShadow: "0 8px 24px rgba(255,45,122,0.28)"
+    boxShadow: "0 8px 24px rgba(255,45,122,0.25)",
+    flexShrink: 0
   },
   smallAvatar: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 999,
     background: "linear-gradient(135deg, #ff5ba7 0%, #ff2d7a 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 700,
     flexShrink: 0,
     marginTop: 4
   },
   name: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 700,
-    letterSpacing: "0.04em"
+    lineHeight: 1.1
   },
   status: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.78)",
-    marginTop: 2
+    fontSize: 14,
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 4
   },
   progressWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 10
+    gap: 8,
+    flexShrink: 0
   },
   progressBar: {
-    width: 110,
-    height: 16,
+    width: 92,
+    height: 14,
     borderRadius: 999,
     background: "rgba(255,255,255,0.08)",
     overflow: "hidden"
@@ -243,76 +242,73 @@ const styles: Record<string, React.CSSProperties> = {
   progressFill: {
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #d08bff 0%, #8f7dff 100%)"
+    background: "linear-gradient(90deg, #c98cff 0%, #8d7dff 100%)"
   },
   progressText: {
-    fontSize: 22,
-    fontWeight: 600,
-    color: "rgba(255,255,255,0.86)"
+    fontSize: 16,
+    fontWeight: 700,
+    color: "rgba(255,255,255,0.9)"
   },
   chatArea: {
     flex: 1,
-    padding: "20px 14px 120px",
+    overflowY: "auto",
+    padding: "18px 12px 12px",
     display: "flex",
     flexDirection: "column",
-    gap: 16
+    gap: 14
   },
   row: {
     display: "flex",
     alignItems: "flex-start",
-    gap: 10
+    gap: 8
   },
   bubble: {
     maxWidth: "78%",
-    padding: "16px 18px",
-    borderRadius: 24,
-    fontSize: 17,
-    lineHeight: 1.7,
+    padding: "14px 16px",
+    borderRadius: 22,
+    fontSize: 16,
+    lineHeight: 1.65,
     whiteSpace: "pre-wrap",
     wordBreak: "break-word"
   },
   assistantBubble: {
-    background: "rgba(20, 16, 48, 0.95)",
-    border: "1px solid rgba(145,132,255,0.14)",
-    color: "#fff",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.16)"
+    background: "rgba(18, 16, 44, 0.95)",
+    border: "1px solid rgba(145,132,255,0.15)",
+    color: "#fff"
   },
   userBubble: {
-    background: "linear-gradient(135deg, #a98dff 0%, #8d7dff 100%)",
-    color: "#fff",
-    boxShadow: "0 10px 28px rgba(141,125,255,0.28)"
+    background: "linear-gradient(135deg, #aa8dff 0%, #8d7dff 100%)",
+    color: "#fff"
   },
   footer: {
-    position: "sticky",
-    bottom: 0,
     display: "flex",
     gap: 10,
-    padding: "14px",
-    background: "rgba(3,4,13,0.96)",
+    padding: "12px",
     borderTop: "1px solid rgba(255,255,255,0.06)",
-    backdropFilter: "blur(10px)"
+    background: "rgba(3,4,13,0.98)",
+    position: "sticky",
+    bottom: 0,
+    paddingBottom: "calc(12px + env(safe-area-inset-bottom))"
   },
   input: {
     flex: 1,
     height: 54,
     borderRadius: 18,
     border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(13,14,28,0.95)",
+    background: "rgba(13,14,28,0.96)",
     color: "#fff",
     padding: "0 16px",
     fontSize: 16,
     outline: "none"
   },
   sendButton: {
-    minWidth: 74,
+    width: 86,
     height: 54,
     borderRadius: 18,
     border: "none",
-    background: "#ffffff",
+    background: "#fff",
     color: "#111",
     fontSize: 16,
-    fontWeight: 700,
-    cursor: "pointer",
-    opacity: 1
+    fontWeight: 700
   }
 }
