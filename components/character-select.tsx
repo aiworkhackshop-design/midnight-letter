@@ -1,57 +1,74 @@
 "use client"
 
+import { useState } from "react"
 import type { Character } from "@/lib/types"
+import { characters } from "@/lib/characters"
+import { CharacterCard } from "./character-card"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-interface CharacterCardProps {
-  character: Character
-  isSelected: boolean
+interface CharacterSelectProps {
   onSelect: (character: Character) => void
 }
 
-export function CharacterCard({ character, isSelected, onSelect }: CharacterCardProps) {
+export function CharacterSelect({ onSelect }: CharacterSelectProps) {
+  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
+
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(character)}
-      className={cn(
-        "relative w-full rounded-[28px] px-6 py-7 text-left transition-all duration-300",
-        "border border-white/10 bg-[#090b1a]/95",
-        "shadow-[0_0_0_1px_rgba(255,255,255,0.02)]",
-        "hover:border-white/15 hover:bg-[#0b0f22]",
-        "focus:outline-none",
-        isSelected && "border-[#9b8cff] bg-[#0b0f22] ring-2 ring-[#9b8cff]/50"
-      )}
-    >
-      <div className="flex items-start gap-5">
-        <div
-          className={cn(
-            "flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-4xl font-serif text-white shadow-lg",
-            character.avatarColor
-          )}
-        >
-          {character.name[0]}
-        </div>
-
-        <div className="min-w-0 flex-1 pt-1">
-          <div className="flex items-baseline gap-3">
-            <h3 className="font-serif text-[34px] leading-none text-white">
-              {character.name}
-            </h3>
-            <span className="text-[18px] uppercase tracking-[0.18em] text-white/35">
-              {character.nameEn}
-            </span>
-          </div>
-
-          <p className="mt-3 text-[18px] font-medium text-[#9b8cff]">
-            {character.personality}
+    <div className="flex min-h-screen flex-col bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/40 bg-background/90 px-6 py-5 backdrop-blur-xl">
+        <div className="text-center">
+          <h1 className="font-serif text-3xl font-semibold tracking-wider text-foreground">
+            Midnight Letter
+          </h1>
+          <p className="mt-1.5 text-sm tracking-wide text-muted-foreground">
+            彼女たちとの、特別な夜を
           </p>
+        </div>
+      </header>
 
-          <p className="mt-5 text-[18px] leading-[1.9] text-white/72">
-            {character.description}
+      <div className="flex-1 px-5 py-8 pb-40">
+        <div className="mx-auto max-w-md">
+          <h2 className="mb-6 text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Choose Your Partner
+          </h2>
+
+          <div className="space-y-5">
+            {characters.map((character) => (
+              <CharacterCard
+                key={character.id}
+                character={character}
+                isSelected={selectedCharacter?.id === character.id}
+                onSelect={setSelectedCharacter}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border/40 bg-background/95 px-5 py-5 backdrop-blur-xl">
+        <div className="mx-auto max-w-md">
+          <Button
+            type="button"
+            onClick={() => selectedCharacter && onSelect(selectedCharacter)}
+            disabled={!selectedCharacter}
+            className={cn(
+              "w-full rounded-2xl py-6 text-base font-semibold tracking-wide transition-all duration-300",
+              selectedCharacter
+                ? "bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/25 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/30"
+                : "cursor-not-allowed border border-border/50 bg-secondary text-muted-foreground"
+            )}
+          >
+            {selectedCharacter
+              ? `${selectedCharacter.name}と会話を始める`
+              : "パートナーを選んでください"}
+          </Button>
+
+          <p className="mt-4 text-center text-xs tracking-wide text-muted-foreground">
+            無料で10回までメッセージを送信できます
           </p>
         </div>
       </div>
-    </button>
+    </div>
   )
 }
