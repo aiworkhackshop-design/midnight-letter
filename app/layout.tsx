@@ -1,18 +1,19 @@
+import "./globals.css"
+import type { ReactNode } from "react"
+
 export const metadata = {
   title: "Midnight Letter",
-  description: "恋愛没入型AIチャット"
+  description: "恋愛没入型AIチャット",
 }
 
 export default function RootLayout({
-  children
+  children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="ja">
-      <body style={{ margin: 0, background: "#0a0a0f", color: "white" }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   )
 }
